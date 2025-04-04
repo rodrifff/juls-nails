@@ -30,7 +30,7 @@ Aplicación web para la gestión de turnos de manicura y pedicura.
 
 1. Clonar el repositorio
 ```bash
-git clone https://github.com/tu-usuario/juls-nails.git
+git clone https://github.com/rodrifff/juls-nails.git
 cd juls-nails
 ```
 
