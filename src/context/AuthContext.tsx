@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { auth, db } from '../services/firebase'
-import { User, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth'
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { User } from '../types/user'
 
 interface AuthContextType {
   user: User | null
@@ -20,11 +21,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUser(user)
-        const userDoc = await getDoc(doc(db, 'users', user.uid))
-        setIsAdmin(userDoc.data()?.isAdmin || false)
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
+        const userData = userDoc.data()
+        const customUser = {
+          ...firebaseUser,
+          isAdmin: userData?.isAdmin || false,
+        } as User
+        setUser(customUser)
+        setIsAdmin(customUser.isAdmin || false)
       } else {
         setUser(null)
         setIsAdmin(false)

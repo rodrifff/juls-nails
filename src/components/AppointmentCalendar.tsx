@@ -1,125 +1,144 @@
 import { useState } from 'react'
-import { Box, Button, Grid, Text, useToast } from '@chakra-ui/react'
-import { format, addDays, isWithinInterval, setHours, setMinutes } from 'date-fns'
+import { Box, Grid, Button, Text, useToast } from '@chakra-ui/react'
+import { format, addDays, isWeekend, setHours, setMinutes, isBefore } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useAuth } from '../context/AuthContext'
+import { createAppointment } from '../services/appointments'
 import { motion } from 'framer-motion'
 
 const MotionBox = motion(Box)
 
-interface AppointmentCalendarProps {
-  onSelectTime: (date: Date) => void
-}
-
-export const AppointmentCalendar = ({ onSelectTime }: AppointmentCalendarProps) => {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+export const AppointmentCalendar = () => {
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const { user } = useAuth()
   const toast = useToast()
 
-  const isWeekend = (date: Date) => {
-    return date.getDay() === 0 || date.getDay() === 6
+  const generateDates = () => {
+    const dates = []
+    const today = new Date()
+    for (let i = 0; i < 14; i++) {
+      const date = addDays(today, i)
+      if (!isWeekend(date)) {
+        dates.push(date)
+      }
+    }
+    return dates
   }
 
-  const isWithinBusinessHours = (date: Date) => {
-    const morningStart = setHours(setMinutes(date, 0), 8)
-    const morningEnd = setHours(setMinutes(date, 0), 10)
-    const afternoonStart = setHours(setMinutes(date, 0), 14)
-    const afternoonEnd = setHours(setMinutes(date, 0), 19)
-
-    return (
-      isWithinInterval(date, { start: morningStart, end: morningEnd }) ||
-      isWithinInterval(date, { start: afternoonStart, end: afternoonEnd })
-    )
-  }
-
-  const generateTimeSlots = () => {
+  const generateTimeSlots = (date: Date) => {
     const slots = []
-    const currentDate = new Date(selectedDate)
+    const startHour = 9
+    const endHour = 18
 
-    if (isWeekend(currentDate)) {
-      return []
+    for (let hour = startHour; hour <= endHour; hour++) {
+      for (let minutes of [0, 30]) {
+        const time = setMinutes(setHours(date, hour), minutes)
+        if (!isBefore(time, new Date())) {
+          slots.push(time)
+        }
+      }
     }
-
-    // Horario de la mañana (8:00 - 10:00)
-    for (let hour = 8; hour < 10; hour++) {
-      slots.push(setHours(setMinutes(currentDate, 0), hour))
-    }
-
-    // Horario de la tarde (14:00 - 19:00)
-    for (let hour = 14; hour < 19; hour++) {
-      slots.push(setHours(setMinutes(currentDate, 0), hour))
-    }
-
     return slots
   }
 
   const handleDateSelect = (date: Date) => {
-    if (isWeekend(date)) {
-      toast({
-        title: 'No se pueden seleccionar fines de semana',
-        status: 'warning',
-        duration: 3000,
-        isClosable: true,
-      })
-      return
-    }
     setSelectedDate(date)
   }
 
-  const handleTimeSelect = (time: Date) => {
-    if (!isWithinBusinessHours(time)) {
+  const handleTimeSelect = async (time: Date) => {
+    if (!user) {
       toast({
-        title: 'Horario no disponible',
+        title: 'Debes iniciar sesión',
+        description: 'Para reservar un turno necesitas estar registrado',
         status: 'warning',
         duration: 3000,
         isClosable: true,
       })
       return
     }
-    onSelectTime(time)
+
+    try {
+      await createAppointment({
+        userId: user.uid,
+        date: time,
+        status: 'pending',
+        userName: user.displayName || 'Usuario',
+        userEmail: user.email || '',
+      })
+
+      toast({
+        title: 'Turno reservado',
+        description: `Tu turno ha sido reservado para el ${format(time, "PPPp", { locale: es })}`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      })
+
+      setSelectedDate(null)
+    } catch (error) {
+      toast({
+        title: 'Error al reservar el turno',
+        description: 'Por favor intenta nuevamente',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    }
   }
 
   return (
     <Box>
-      <Grid templateColumns="repeat(7, 1fr)" gap={2} mb={4}>
-        {Array.from({ length: 7 }).map((_, index) => {
-          const date = addDays(new Date(), index)
-          return (
-            <MotionBox
-              key={index}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Button
-                w="100%"
-                colorScheme={format(date, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') ? 'brand' : 'gray'}
-                onClick={() => handleDateSelect(date)}
-                disabled={isWeekend(date)}
-              >
-                <Box>
-                  <Text fontSize="sm">{format(date, 'EEE', { locale: es })}</Text>
-                  <Text fontSize="lg">{format(date, 'd')}</Text>
-                </Box>
-              </Button>
-            </MotionBox>
-          )
-        })}
-      </Grid>
-
-      <Grid templateColumns="repeat(3, 1fr)" gap={2}>
-        {generateTimeSlots().map((time, index) => (
+      <Text fontSize="lg" fontWeight="bold" mb={4}>
+        Selecciona una fecha:
+      </Text>
+      <Grid templateColumns="repeat(auto-fill, minmax(100px, 1fr))" gap={4} mb={6}>
+        {generateDates().map((date) => (
           <MotionBox
-            key={index}
+            key={date.toISOString()}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             <Button
-              w="100%"
-              onClick={() => handleTimeSelect(time)}
+              onClick={() => handleDateSelect(date)}
+              colorScheme={selectedDate?.toDateString() === date.toDateString() ? 'brand' : 'gray'}
+              width="100%"
+              height="auto"
+              py={2}
             >
-              {format(time, 'HH:mm')}
+              <Box>
+                <Text>{format(date, "EEEE", { locale: es })}</Text>
+                <Text>{format(date, "d MMM", { locale: es })}</Text>
+              </Box>
             </Button>
           </MotionBox>
         ))}
       </Grid>
+
+      {selectedDate && (
+        <>
+          <Text fontSize="lg" fontWeight="bold" mb={4}>
+            Horarios disponibles:
+          </Text>
+          <Grid templateColumns="repeat(auto-fill, minmax(100px, 1fr))" gap={4}>
+            {generateTimeSlots(selectedDate).map((time) => (
+              <MotionBox
+                key={time.toISOString()}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button
+                  onClick={() => handleTimeSelect(time)}
+                  colorScheme="brand"
+                  variant="outline"
+                  width="100%"
+                >
+                  {format(time, "HH:mm")}
+                </Button>
+              </MotionBox>
+            ))}
+          </Grid>
+        </>
+      )}
     </Box>
   )
 } 

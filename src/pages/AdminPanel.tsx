@@ -3,7 +3,6 @@ import {
   Box,
   Container,
   Heading,
-  Text,
   SimpleGrid,
   Stat,
   StatLabel,
@@ -15,10 +14,9 @@ import {
   Tr,
   Th,
   Td,
-  Button,
-  useToast,
   Badge,
   Select,
+  useToast,
 } from '@chakra-ui/react'
 import { useAuth } from '../context/AuthContext'
 import { getUserAppointments, updateAppointment, Appointment } from '../services/appointments'

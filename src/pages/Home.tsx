@@ -10,7 +10,7 @@ export const Home = () => {
 
   return (
     <Container maxW="container.xl" py={10}>
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10} align="center">
+      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10} alignItems="center">
         <MotionBox
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
